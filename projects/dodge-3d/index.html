@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>躲避游戏 3D · 朱栩汕</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="stage"></div>
+
+<div id="hud">
+  <div class="hud-left">
+    <div class="hud-title">躲避游戏 <span class="badge">3D</span></div>
+    <div class="hud-hint">WASD / 方向键 移动</div>
+  </div>
+  <div class="hud-right">
+    <div class="stat">
+      <span class="stat-label">剩余时间</span>
+      <span class="stat-value" id="timeText">180</span>
+      <span class="stat-unit">s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">生命</span>
+      <span class="lives" id="livesBox"></span>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="gameModal">
+  <div class="modal-box">
+    <h2 id="modalTitle">游戏结束</h2>
+    <p class="modal-sub" id="modalSub"></p>
+    <div class="modal-actions">
+      <button id="restartBtn">再来一局</button>
+      <a class="ghost" href="../../index.html">返回作品集</a>
+    </div>
+  </div>
+</div>
+
+<script src="three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
