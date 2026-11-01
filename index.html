@@ -3,15 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Showcase · 作品集</title>
+<title>朱栩汕 · 作品集</title>
 <style>
   :root {
     --bg: #f7f7f5;
-    --card: #ffffff;
+    --panel: #ffffff;
     --ink: #1c1c1a;
     --muted: #6b6b66;
     --line: #e6e6e1;
     --accent: #2f6f4e;
+    --accent-soft: #eaf3ee;
+    --hover: #f4f4f0;
   }
   * { box-sizing: border-box; }
   body {
@@ -20,96 +22,225 @@
     color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
       "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    line-height: 1.65;
+    line-height: 1.7;
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 72px 24px 96px; }
-  header { margin-bottom: 56px; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 72px 24px 88px; }
+
+  /* ---------- 首页头部 ---------- */
+  header { margin-bottom: 72px; }
   .kicker {
-    font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--accent); font-weight: 600; margin-bottom: 14px;
+    font-size: 13px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin-bottom: 16px;
   }
   h1 {
-    font-size: 40px; line-height: 1.2; margin: 0 0 16px;
+    font-size: 46px; line-height: 1.15; margin: 0 0 18px;
     letter-spacing: -.02em; font-weight: 700;
   }
-  .lead { font-size: 17px; color: var(--muted); margin: 0; max-width: 56ch; }
-  h2 {
-    font-size: 15px; letter-spacing: .08em; text-transform: uppercase;
+  .intro { font-size: 17px; color: var(--muted); margin: 0 0 30px; max-width: 58ch; }
+  .entry { display: flex; flex-wrap: wrap; gap: 10px; }
+  .entry a {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line);
+    color: var(--ink); text-decoration: none; font-size: 14px;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .entry a:hover { border-color: #b9d4c5; transform: translateY(-1px); }
+  .entry a .no {
+    font-size: 11px; color: var(--accent); font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- 作品区块 ---------- */
+  h2.sec {
+    font-size: 14px; letter-spacing: .1em; text-transform: uppercase;
     color: var(--muted); font-weight: 600;
-    margin: 48px 0 20px; padding-bottom: 10px;
+    margin: 0 0 26px; padding-bottom: 10px;
     border-bottom: 1px solid var(--line);
   }
-  .grid { display: grid; gap: 14px; }
-  .card {
-    display: block; text-decoration: none; color: inherit;
-    background: var(--card); border: 1px solid var(--line);
-    border-radius: 10px; padding: 20px 22px;
-    transition: border-color .18s ease, transform .18s ease;
+  section.works { margin-bottom: 72px; }
+
+  .work {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 26px 28px;
+    margin-bottom: 18px;
   }
-  .card:hover { border-color: #c9c9c2; transform: translateY(-1px); }
-  .card-title { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
-  .card-desc { font-size: 14px; color: var(--muted); margin: 0; }
-  .empty {
-    background: var(--card); border: 1px dashed var(--line);
-    border-radius: 10px; padding: 32px 22px; text-align: center;
-    color: var(--muted); font-size: 14px;
+  .work-head {
+    display: flex; align-items: baseline; gap: 14px;
+    margin-bottom: 4px; flex-wrap: wrap;
   }
-  code {
-    background: #eeeee9; padding: 2px 6px; border-radius: 4px;
-    font-size: 13px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  .work-no {
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums;
   }
-  footer {
-    margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line);
+  .work-title { font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
+  .work-tag {
+    font-size: 11.5px; color: var(--muted);
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: 3px 10px; font-weight: 500;
+  }
+  .work-line { margin: 0 0 14px; }
+  .work-line .label {
+    display: inline-block; width: 68px; flex: none;
+    font-size: 12px; color: #a3a39c; letter-spacing: .06em;
+  }
+  .work-line p { display: inline; font-size: 14.5px; margin: 0; }
+  .work-line.idea p { color: #3f3f3a; }
+  .work-line .tech {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
     font-size: 13px; color: var(--muted);
-    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .work-open {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 6px; font-size: 14px; font-weight: 600;
+    color: var(--accent); text-decoration: none;
+  }
+  .work-open:hover { text-decoration: underline; }
+
+  /* ---------- 关于我 ---------- */
+  section.about { margin-bottom: 64px; }
+  .about-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+  }
+  .about-card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px 20px;
+  }
+  .about-card .k {
+    font-size: 12px; color: #a3a39c; letter-spacing: .08em;
+    margin-bottom: 6px;
+  }
+  .about-card .v { font-size: 15.5px; font-weight: 600; }
+  .about-card .v a { color: var(--accent); text-decoration: none; word-break: break-all; }
+  .about-card .v a:hover { text-decoration: underline; }
+
+  footer {
+    padding-top: 24px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
   }
   footer a { color: var(--accent); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
+
   @media (max-width: 560px) {
-    .wrap { padding: 48px 20px 72px; }
-    h1 { font-size: 30px; }
+    .wrap { padding: 48px 18px 64px; }
+    h1 { font-size: 34px; }
+    .work { padding: 22px 20px; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <header>
-    <div class="kicker">Showcase</div>
-    <h1>我的作品集</h1>
-    <p class="lead">这里收集我做过的东西——项目、设计、写下的文字。持续更新中。</p>
+  <!-- ============ 首页 ============ -->
+  <header id="top">
+    <div class="kicker">Portfolio</div>
+    <h1>朱栩汕</h1>
+    <p class="intro">
+      数字媒体艺术专业，大二。我想做「会动的东西」——用代码生成画面、让人参与其中的交互，以及能在浏览器里直接玩起来的小游戏。
+    </p>
+    <div class="entry">
+      <a href="#w1"><span class="no">01</span> 几何构成</a>
+      <a href="#w2"><span class="no">02</span> 运动轨迹</a>
+      <a href="#w3"><span class="no">03</span> 躲避游戏 3D</a>
+    </div>
   </header>
 
-  <h2>项目</h2>
-  <div class="grid">
-    <a class="card" href="projects/dodge-forest/">
-      <div class="card-title">躲避游戏</div>
-      <p class="card-desc">原生 Canvas 小游戏 · WASD 移动，躲开四面飞来的子弹，撑过 180 秒</p>
-    </a>
-    <a class="card" href="projects/motion-trajectory/">
-      <div class="card-title">运动轨迹</div>
-      <p class="card-desc">p5.js 交互作品 · 鼠标划过海面，激起一圈圈扩散消散的涟漪</p>
-    </a>
-    <a class="card" href="projects/geometric-composition/">
-      <div class="card-title">几何构成</div>
-      <p class="card-desc">p5.js 生成的程序化几何图形 · 圆与方块按网格交替排布，颜色随坐标连续过渡</p>
-    </a>
-  </div>
+  <!-- ============ 作品 ============ -->
+  <section class="works">
+    <h2 class="sec">作品</h2>
 
-  <h2>关于</h2>
-  <div class="grid">
-    <div class="card" style="cursor:default">
-      <div class="card-title">怎么添加作品</div>
-      <p class="card-desc">
-        在仓库里新建 <code>projects/作品名/</code> 目录，放入文件，提交并推送。
-        如果作品是网页，可以放进目录后直接访问对应路径预览。
-      </p>
+    <article class="work" id="w1">
+      <div class="work-head">
+        <span class="work-no">01</span>
+        <span class="work-title">几何构成</span>
+        <span class="work-tag">p5.js · 静态作品</span>
+      </div>
+      <div class="work-line">
+        <span class="label">说明</span>
+        <p>网格上圆与方块交替排布，颜色随坐标连续过渡的静态构成画面。</p>
+      </div>
+      <div class="work-line idea">
+        <span class="label">创作思路</span>
+        <p>以网格为骨架，用 map() 把坐标映射成 RGB 值，让颜色随位置连续渐变；再按 (x+y) 的奇偶交替画圆和方块，形成节奏感，图形尺寸也随坐标缓慢缩放。</p>
+      </div>
+      <div class="work-line">
+        <span class="label">技术</span>
+        <span class="tech">p5.js · Canvas 2D · map() 渐变映射</span>
+      </div>
+      <a class="work-open" href="projects/geometric-composition/index.html">打开作品 →</a>
+    </article>
+
+    <article class="work" id="w2">
+      <div class="work-head">
+        <span class="work-no">02</span>
+        <span class="work-title">运动轨迹</span>
+        <span class="work-tag">p5.js · 交互作品</span>
+      </div>
+      <div class="work-line">
+        <span class="label">说明</span>
+        <p>鼠标划过海面激起涟漪，一圈圈扩散、变淡、消失。</p>
+      </div>
+      <div class="work-line idea">
+        <span class="label">创作思路</span>
+        <p>海面用逐行插值画渐变；鼠标划过时在指针处生成波纹，半径扩散、透明度衰减，越界即回收。双层椭圆叠出水面透视，再加一层缓慢漂移的细波纹，静止时海面也不死板。</p>
+      </div>
+      <div class="work-line">
+        <span class="label">技术</span>
+        <span class="tech">p5.js · Canvas 2D · 数组管理粒子生命周期</span>
+      </div>
+      <a class="work-open" href="projects/motion-trajectory/index.html">打开作品 →</a>
+    </article>
+
+    <article class="work" id="w3">
+      <div class="work-head">
+        <span class="work-no">03</span>
+        <span class="work-title">躲避游戏 3D</span>
+        <span class="work-tag">Three.js · 小游戏</span>
+      </div>
+      <div class="work-line">
+        <span class="label">说明</span>
+        <p>3D 场地里用 WASD 移动，躲开四面飞来的能量球，撑过 180 秒。</p>
+      </div>
+      <div class="work-line idea">
+        <span class="label">创作思路</span>
+        <p>把 2D 躲避玩法搬进三维：发光网格场地配指数雾营造空间感，能量球从场地外圈随机生成、朝玩家直线飞来；碰撞用 XZ 平面距离判定，命中后清场并进入短暂无敌闪烁。</p>
+      </div>
+      <div class="work-line">
+        <span class="label">技术</span>
+        <span class="tech">Three.js (r128) · WebGL · 透视相机 · 实时阴影</span>
+      </div>
+      <a class="work-open" href="projects/dodge-3d/index.html">打开作品 →</a>
+    </article>
+  </section>
+
+  <!-- ============ 关于我 ============ -->
+  <section class="about">
+    <h2 class="sec">关于我</h2>
+    <div class="about-grid">
+      <div class="about-card">
+        <div class="k">专业</div>
+        <div class="v">数字媒体艺术</div>
+      </div>
+      <div class="about-card">
+        <div class="k">年级</div>
+        <div class="v">大二</div>
+      </div>
+      <div class="about-card">
+        <div class="k">感兴趣的方向</div>
+        <div class="v">创意编程 · 生成艺术 · 交互体验</div>
+      </div>
+      <div class="about-card">
+        <div class="k">联系方式</div>
+        <div class="v"><a href="mailto:524408014@qq.com">524408014@qq.com</a></div>
+      </div>
     </div>
-  </div>
+  </section>
 
   <footer>
-    <span>© <span id="year">2026</span> sleepy677</span>
+    <span>© <span id="year">2026</span> 朱栩汕 · 数字媒体艺术</span>
     <a href="https://github.com/sleepy677/showcase">GitHub 仓库</a>
   </footer>
 
