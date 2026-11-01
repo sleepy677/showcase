@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>躲避游戏 · 朱栩汕</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
+body{background:#1a1a1a;display:flex;flex-direction:column;align-items:center;padding:10px;color:#fff}
+#gameCanvas{border:2px solid #666;background:#7ed957;image-rendering:pixelated;max-width:100%;height:auto}
+.info{margin-bottom:8px;font-size:18px}
+.modal{
+    position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);
+    display:none;justify-content:center;align-items:center;z-index:99
+}
+.modal-box{
+    background:#222;padding:30px;border-radius:12px;text-align:center;
+    border:1px solid #555
+}
+.modal-box h2{margin-bottom:20px}
+.modal-sub{color:#aaa;margin-bottom:20px;display:block;}
+.modal-box button{
+    padding:10px 20px;margin:0 8px;font-size:16px;cursor:pointer;border:none;border-radius:6px
+}
+#restartBtn{background:#28a745;color:white}
+#quitBtn{background:#dc3545;color:white}
+</style>
+</head>
+<body>
+<div class="info">剩余时间：<span id="timeText">180</span> 秒 | 生命：<span id="lifeText">3</span> | WASD移动</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<div class="modal" id="gameModal">
+    <div class="modal-box">
+        <h2 id="modalTitle">游戏结束</h2>
+        <span class="modal-sub" id="modalSub"></span>
+        <button id="restartBtn">重新开始</button>
+        <button id="quitBtn">结束</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const timeText = document.getElementById('timeText');
+const lifeText = document.getElementById('lifeText');
+const modal = document.getElementById('gameModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalSub = document.getElementById('modalSub');
+const restartBtn = document.getElementById('restartBtn');
+const quitBtn = document.getElementById('quitBtn');
+
+let player = {x:400,y:300,w:24,h:24,speed:5};
+let bullets = [];
+let keys = {};
+let gameTime = 180;
+let state = "playing";
+let elapsed = 0;
+let timer = null;
+
+let lives = 3;
+let invincible = false;
+let invincibleTimer = null;
+
+// 森林背景图（已裁掉水印并缩放到 1600×1200，与画布同为 4:3）
+const forestBg = new Image();
+forestBg.src = 'forest_bg.jpg'; // 与本 HTML 同目录；如移动文件请同步修改路径
+forestBg.onload = () => { bgReady = true; };
+forestBg.onerror = () => {
+  // 图片加载失败时退回草地底色，避免白屏
+  console.warn('森林背景加载失败，已退回草地底色。');
+  bgReady = false;
+};
+let bgReady = false;
+
+window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;})
+window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;})
+
+function spawnBullet(){
+    if(state !== "playing") return;
+    let x,y;
+    const side = Math.floor(Math.random()*4);
+    if(side===0){x=Math.random()*canvas.width;y=0;}
+    else if(side===1){x=canvas.width;y=Math.random()*canvas.height;}
+    else if(side===2){x=Math.random()*canvas.width;y=canvas.height;}
+    else{x=0;y=Math.random()*canvas.height;}
+
+    const dx = player.x - x;
+    const dy = player.y - y;
+    const len = Math.sqrt(dx*dx+dy*dy);
+    const speed = 2.5;
+    bullets.push({
+        x,y,
+        vx: dx/len * speed,
+        vy: dy/len * speed,
+        r:5
+    })
+}
+
+function checkCollision(bullet){
+    const px = player.x;
+    const py = player.y;
+    const pw = player.w/2;
+    const ph = player.h/2;
+    const dist = Math.sqrt((bullet.x-px)**2 + (bullet.y-py)**2);
+    return dist < bullet.r + pw;
+}
+
+function hitPlayer() {
+    if(invincible || state !== "playing") return;
+    lives--;
+    lifeText.innerText = lives;
+    bullets.length = 0; // 原地清空：若重新赋值 bullets，正在遍历的循环下一轮会拿到 undefined 而抛 TypeError 卡死
+    invincible = true;
+
+    clearTimeout(invincibleTimer);
+    invincibleTimer = setTimeout(()=>{
+        invincible = false;
+    },1200);
+
+    if(lives <= 0) {
+        endGame(false);
+    }
+}
+
+function endGame(win) {
+    if(state === "over") return;
+    state = "over";
+    clearInterval(timer);
+    clearTimeout(invincibleTimer);
+    if(win) {
+        modalTitle.innerText = "时间到！游戏结束";
+        modalSub.innerText = "恭喜你成功躲避子弹！";
+    } else {
+        modalTitle.innerText = "生命耗尽！";
+        modalSub.innerText = "你被子弹击中多次";
+    }
+    modal.style.display = "flex";
+}
+
+// 绘制森林背景，按比例适配 800×600（cover：等比缩放、居中裁切、不变形）
+function drawBackground() {
+  if (bgReady && forestBg.naturalWidth) {
+    const scale = Math.max(canvas.width / forestBg.naturalWidth, canvas.height / forestBg.naturalHeight);
+    const drawW = forestBg.naturalWidth * scale;
+    const drawH = forestBg.naturalHeight * scale;
+    const offsetX = (canvas.width - drawW) / 2;
+    const offsetY = (canvas.height - drawH) / 2;
+    ctx.drawImage(forestBg, offsetX, offsetY, drawW, drawH);
+  } else {
+    // 图片未加载完成时的临时底色
+    ctx.fillStyle = '#7ed957';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+// 绘制小兵玩家
+function drawPlayer(ts) {
+  const x = Math.round(player.x);
+  const y = Math.round(player.y);
+  const flicker = invincible && Math.floor(ts / 100) % 2 === 0;
+
+  if (flicker) {
+    ctx.globalAlpha = 0.35;
+  }
+
+  ctx.imageSmoothingEnabled = false;
+
+  // 白色衬底：小兵走进深绿剪影区域时仍能和背景区分开
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillRect(x - 9, y - 11, 18, 23);
+
+  // 身体底色
+  ctx.fillStyle = '#6b7280';
+  ctx.fillRect(x - 8, y - 6, 16, 14);
+
+  // 头盔
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillRect(x - 7, y - 10, 14, 5);
+  ctx.fillStyle = '#60a5fa';
+  ctx.fillRect(x - 6, y - 9, 12, 2);
+
+  // 头盔带
+  ctx.fillStyle = '#1e3a8a';
+  ctx.fillRect(x - 7, y - 6, 14, 1);
+
+  // 眼睛/面罩
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(x - 5, y - 4, 10, 2);
+
+  // 护甲高光
+  ctx.fillStyle = '#9ca3af';
+  ctx.fillRect(x - 6, y - 2, 12, 1);
+
+  // 腰带
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(x - 6, y + 3, 12, 2);
+
+  // 腿
+  ctx.fillStyle = '#1f2937';
+  ctx.fillRect(x - 7, y + 7, 5, 4);
+  ctx.fillRect(x + 2, y + 7, 5, 4);
+
+  // 枪
+  ctx.fillStyle = '#374151';
+  ctx.fillRect(x + 8, y, 6, 2);
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(x + 12, y, 2, 2);
+
+  ctx.globalAlpha = 1;
+  ctx.imageSmoothingEnabled = true;
+}
+
+let lastTs = 0;
+function loop(ts){
+    if(state !== "playing") return;
+    if(!lastTs) lastTs = ts;
+    const delta = ts - lastTs;
+    lastTs = ts;
+    elapsed += delta;
+
+    drawBackground();
+
+    if(keys['w'] && player.y-player.h/2>0) player.y -= player.speed;
+    if(keys['s'] && player.y+player.h/2<canvas.height) player.y += player.speed;
+    if(keys['a'] && player.x-player.w/2>0) player.x -= player.speed;
+    if(keys['d'] && player.x+player.w/2<canvas.width) player.x += player.speed;
+
+    drawPlayer(ts);
+
+    for(let i=bullets.length-1;i>=0;i--){
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+
+        ctx.beginPath();
+        ctx.arc(b.x,b.y,b.r+1.5,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,0.9)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+        ctx.fillStyle="#ff4444";
+        ctx.fill();
+
+        if(checkCollision(b)){
+            hitPlayer();
+            break; // 子弹已全部清空，必须终止本帧遍历
+        }
+        if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height){
+            bullets.splice(i,1);
+        }
+    }
+    requestAnimationFrame(loop);
+}
+
+function resetGame(){
+    player.x = 400;
+    player.y = 300;
+    bullets = [];
+    gameTime = 180;
+    state = "playing";
+    elapsed = 0;
+    lastTs = 0;
+    lives = 3;
+    invincible = false;
+    clearTimeout(invincibleTimer);
+    lifeText.innerText = lives;
+    modal.style.display = "none";
+    timeText.innerText = gameTime;
+    startTimer();
+    requestAnimationFrame(loop);
+}
+
+function startTimer(){
+    clearInterval(timer);
+    timer = setInterval(()=>{
+        gameTime--;
+        timeText.innerText = gameTime;
+        if(gameTime <=0){
+            endGame(true);
+        }
+    },1000);
+}
+
+setInterval(()=>{
+    if(state === "playing") spawnBullet();
+},450);
+
+restartBtn.onclick = resetGame;
+quitBtn.onclick = ()=>{
+    modal.style.display = "none";
+    alert("游戏已退出，刷新页面重新开始");
+};
+
+globalThis.__G = {
+    get player(){return player},
+    get bullets(){return bullets},
+    get state(){return state},
+    get elapsed(){return elapsed},
+    endGame: function(w){ endGame(w); },
+    setPlayer: function(x,y){ player.x = x; player.y = y; }
+};
+
+resetGame();
+</script>
+</body>
+</html>
