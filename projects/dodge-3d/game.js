@@ -1,7 +1,11 @@
 /* ============================================================
-   躲避游戏 3D · Three.js（视觉增强版）
+   躲避游戏 3D · Three.js（视觉增强版 + 掉落物）
    玩法：WASD 在场地内移动，躲开从四面八方飞来的红色能量球，
-        撑过 180 秒即通关；被击中扣 1 条命，共 3 条命。
+        撑过 180 秒即通关；被击中扣 1 条命。
+   掉落物：三种增益随机掉落，碰到即拾取——
+        ◆ 生命晶体（绿）生命 +1（上限 4）
+        ◆ 护盾核心（金）抵挡一次伤害
+        ◆ 时间碎片（蓝）剩余时间 +15 秒
    ============================================================ */
 (function () {
   'use strict';
@@ -14,14 +18,25 @@
   const HIT_RADIUS = 1.15;          // 碰撞判定半径
   const TOTAL_TIME = 180;
   const START_LIVES = 3;
+  const MAX_LIVES = 4;              // 生命上限（掉落物可突破初始 3）
   const INVINCIBLE_MS = 1200;
   const SPAWN_INTERVAL = 0.42;      // 生成间隔（秒）
   const TRAIL_LEN = 9;              // 拖尾历史点数
+
+  /* 掉落物 */
+  const PICKUP_MIN_GAP = 8;         // 最短生成间隔（秒）
+  const PICKUP_MAX_GAP = 14;        // 最长生成间隔（秒）
+  const PICKUP_LIFETIME = 9;        // 掉落物存活时间（秒）
+  const PICKUP_RADIUS = 1.45;       // 拾取判定半径
+  const PICKUP_MIN_DIST = 6;        // 距玩家最短生成距离
+  const TIME_BONUS = 15;            // 时间碎片奖励（秒）
 
   /* ---------------- DOM ---------------- */
   const timeEl = document.getElementById('timeText');
   const timeBar = document.getElementById('timeBar');
   const livesBox = document.getElementById('livesBox');
+  const shieldMark = document.getElementById('shieldMark');
+  const tipEl = document.getElementById('pickupTip');
   const hudEl = document.getElementById('hud');
   const modal = document.getElementById('gameModal');
   const modalTitle = document.getElementById('modalTitle');
@@ -59,6 +74,9 @@
   const glowRedTex = makeGlowTexture('rgba(255,220,225,1)', 'rgba(255,60,90,0.55)');
   const glowCyanTex = makeGlowTexture('rgba(225,250,255,1)', 'rgba(60,190,255,0.5)');
   const glowWhiteTex = makeGlowTexture('rgba(255,255,255,1)', 'rgba(170,200,255,0.4)');
+  const glowGreenTex = makeGlowTexture('rgba(225,255,240,1)', 'rgba(60,230,140,0.55)');
+  const glowGoldTex = makeGlowTexture('rgba(255,244,220,1)', 'rgba(255,190,70,0.55)');
+  const glowBlueTex = makeGlowTexture('rgba(225,240,255,1)', 'rgba(90,160,255,0.55)');
 
   /* ---------------- 场景 / 相机 ---------------- */
   const scene = new THREE.Scene();
@@ -80,7 +98,6 @@
     const COUNT = 550;
     const pos = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) {
-      // 场地外围的环形星尘带，俯瞰视角可见
       const r = 30 + Math.pow(Math.random(), 1.6) * 75;
       const theta = Math.random() * Math.PI * 2;
       pos[i * 3] = r * Math.cos(theta);
@@ -158,7 +175,7 @@
   border.position.y = 0.06;
   scene.add(border);
 
-  // 四角信标柱：发光柱体 + 顶部辉光
+  // 四角信标柱
   const beaconGeo = new THREE.CylinderGeometry(0.14, 0.22, 3.2, 10);
   const beaconMat = new THREE.MeshStandardMaterial({
     color: 0x0d2036,
@@ -246,7 +263,7 @@
   ring.position.y = 0.04;
   player.add(ring);
 
-  // 引擎辉光（跟随玩家背后）
+  // 引擎辉光
   const engineGlow = new THREE.Sprite(new THREE.SpriteMaterial({
     map: glowCyanTex,
     color: 0x66e4ff,
@@ -259,10 +276,25 @@
   engineGlow.position.set(0, 0.5, -0.8);
   player.add(engineGlow);
 
-  // 玩家随身点光：照亮脚下地板
+  // 玩家随身点光
   const playerLight = new THREE.PointLight(0x39d0ff, 1.5, 12, 2);
   playerLight.position.set(0, 3.2, 0);
   player.add(playerLight);
+
+  // 护盾可视化：半透明金色球壳
+  const shieldMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(1.25, 20, 20),
+    new THREE.MeshBasicMaterial({
+      color: 0xffc94d,
+      transparent: true,
+      opacity: 0.16,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  shieldMesh.position.y = 1.1;
+  shieldMesh.visible = false;
+  player.add(shieldMesh);
 
   /* ---------------- 能量球 ---------------- */
   const bulletCoreGeo = new THREE.SphereGeometry(0.34, 14, 14);
@@ -291,7 +323,6 @@
     obj.position.set(sx, 0.9, sz);
     scene.add(obj);
 
-    // 拖尾（历史位置折线）
     const trailGeo = new THREE.BufferGeometry();
     const trailPos = new Float32Array(TRAIL_LEN * 3);
     for (let i = 0; i < TRAIL_LEN; i++) {
@@ -309,7 +340,6 @@
     }));
     scene.add(trail);
 
-    // 朝玩家当前位置定向，生成后沿直线飞行（不追踪）
     const dx = player.position.x - sx;
     const dz = player.position.z - sz;
     const len = Math.sqrt(dx * dx + dz * dz) || 1;
@@ -342,7 +372,7 @@
     bullets.length = 0;
   }
 
-  /* ---------------- 爆炸粒子 ---------------- */
+  /* ---------------- 爆炸粒子（可换色） ---------------- */
   const P_COUNT = 64;
   const pPos = new Float32Array(P_COUNT * 3);
   const pVel = new Float32Array(P_COUNT * 3);
@@ -364,7 +394,8 @@
   scene.add(particles);
   let pCursor = 0;
 
-  function burst(x, y, z, count) {
+  function burst(x, y, z, count, color) {
+    if (color) pMat.color.setHex(color);
     for (let n = 0; n < count; n++) {
       const i = pCursor;
       pCursor = (pCursor + 1) % P_COUNT;
@@ -387,11 +418,11 @@
       if (pLife[i] <= 0) continue;
       alive = true;
       pLife[i] -= dt * 1.5;
-      pVel[i * 3 + 1] -= 7 * dt;             // 重力
+      pVel[i * 3 + 1] -= 7 * dt;
       pPos[i * 3] += pVel[i * 3] * dt;
       pPos[i * 3 + 1] += pVel[i * 3 + 1] * dt;
       pPos[i * 3 + 2] += pVel[i * 3 + 2] * dt;
-      if (pPos[i * 3 + 1] < 0.05) {           // 落地反弹衰减
+      if (pPos[i * 3 + 1] < 0.05) {
         pPos[i * 3 + 1] = 0.05;
         pVel[i * 3 + 1] *= -0.35;
         pVel[i * 3] *= 0.7;
@@ -400,6 +431,125 @@
       if (pLife[i] <= 0) pPos[i * 3 + 1] = -100;
     }
     if (alive) pGeo.attributes.position.needsUpdate = true;
+  }
+
+  /* ---------------- 掉落物 ---------------- */
+  const PICKUP_DEFS = {
+    life: {
+      label: '生命 +1',
+      cls: 't-life',
+      color: 0x35e07f,
+      glow: glowGreenTex,
+      burst: 0x4ff0a0,
+      geo: new THREE.OctahedronGeometry(0.46, 0)
+    },
+    shield: {
+      label: '护盾已激活',
+      cls: 't-shield',
+      color: 0xffc94d,
+      glow: glowGoldTex,
+      burst: 0xffd070,
+      geo: new THREE.IcosahedronGeometry(0.44, 0)
+    },
+    time: {
+      label: '时间 +15s',
+      cls: 't-time',
+      color: 0x5a9cff,
+      glow: glowBlueTex,
+      burst: 0x7db8ff,
+      geo: new THREE.TorusGeometry(0.36, 0.13, 10, 24)
+    }
+  };
+
+  const pickups = [];
+  let pickupTimer = 5;              // 开局 5 秒出第一个
+
+  function spawnPickup() {
+    const types = Object.keys(PICKUP_DEFS);
+    // 生命满了就不掉生命晶体
+    let type;
+    do {
+      type = types[Math.floor(Math.random() * types.length)];
+    } while (type === 'life' && lives >= MAX_LIVES);
+
+    // 随机位置，避开玩家周围
+    let x, z, tries = 0;
+    do {
+      x = (Math.random() * 2 - 1) * (ARENA - 3);
+      z = (Math.random() * 2 - 1) * (ARENA - 3);
+      tries++;
+    } while (
+      tries < 20 &&
+      Math.hypot(x - player.position.x, z - player.position.z) < PICKUP_MIN_DIST
+    );
+
+    const def = PICKUP_DEFS[type];
+    const obj = new THREE.Group();
+
+    const core = new THREE.Mesh(def.geo, new THREE.MeshStandardMaterial({
+      color: def.color,
+      emissive: def.color,
+      emissiveIntensity: 0.75,
+      roughness: 0.3,
+      metalness: 0.45
+    }));
+    core.castShadow = true;
+    obj.add(core);
+
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: def.glow,
+      color: def.color,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    }));
+    glow.scale.set(2.6, 2.6, 1);
+    obj.add(glow);
+
+    // 底部光环
+    const base = new THREE.Mesh(
+      new THREE.RingGeometry(0.55, 0.75, 32),
+      new THREE.MeshBasicMaterial({
+        color: def.color,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+      })
+    );
+    base.rotation.x = -Math.PI / 2;
+    base.position.y = -0.95;
+    obj.add(base);
+
+    obj.position.set(x, 1.1, z);
+    scene.add(obj);
+
+    pickups.push({
+      obj: obj,
+      core: core,
+      glow: glow,
+      base: base,
+      type: type,
+      age: 0
+    });
+  }
+
+  function removePickup(index) {
+    const p = pickups[index];
+    if (!p) return;
+    scene.remove(p.obj);
+    p.core.material.dispose();
+    p.glow.material.dispose();
+    p.base.geometry.dispose();
+    p.base.material.dispose();
+    pickups.splice(index, 1);
+  }
+
+  function clearPickups() {
+    for (let i = pickups.length - 1; i >= 0; i--) {
+      scene.remove(pickups[i].obj);
+    }
+    pickups.length = 0;
   }
 
   /* ---------------- 状态 ---------------- */
@@ -411,6 +561,7 @@
   let spawnTimer = 0;
   let elapsed = 0;
   let shake = 0;
+  let shield = false;
 
   const keys = Object.create(null);
 
@@ -426,7 +577,7 @@
 
   /* ---------------- HUD ---------------- */
   const pips = [];
-  for (let i = 0; i < START_LIVES; i++) {
+  for (let i = 0; i < MAX_LIVES; i++) {
     const pip = document.createElement('span');
     pip.className = 'life-pip';
     livesBox.appendChild(pip);
@@ -439,11 +590,16 @@
     }
   }
 
+  function syncShield() {
+    shieldMark.className = 'shield-mark' + (shield ? ' on' : '');
+    shieldMesh.visible = shield;
+  }
+
   function syncTime() {
     const t = Math.max(0, Math.ceil(timeLeft));
     timeEl.textContent = t;
     if (timeBar) {
-      timeBar.style.width = Math.max(0, (timeLeft / TOTAL_TIME) * 100) + '%';
+      timeBar.style.width = Math.min(100, Math.max(0, (timeLeft / TOTAL_TIME) * 100)) + '%';
     }
     if (t <= 10 && state === 'playing') {
       timeEl.classList.add('danger');
@@ -454,17 +610,55 @@
     }
   }
 
+  let tipTimer = 0;
+  function showTip(text, cls) {
+    tipEl.textContent = text;
+    tipEl.className = '';
+    void tipEl.offsetWidth;              // 重启动画
+    tipEl.className = 'show ' + cls;
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(function () { tipEl.className = ''; }, 1700);
+  }
+
+  /* ---------------- 拾取 ---------------- */
+  function collectPickup(p) {
+    const def = PICKUP_DEFS[p.type];
+    burst(p.obj.position.x, p.obj.position.y, p.obj.position.z, 32, def.burst);
+    showTip(def.label, def.cls);
+
+    if (p.type === 'life') {
+      lives = Math.min(MAX_LIVES, lives + 1);
+      syncLives();
+    } else if (p.type === 'shield') {
+      shield = true;
+      syncShield();
+    } else if (p.type === 'time') {
+      timeLeft += TIME_BONUS;
+      syncTime();
+    }
+  }
+
   /* ---------------- 玩法 ---------------- */
   function hitPlayer() {
     if (invincible || state !== 'playing') return;
 
-    lives -= 1;
-    syncLives();
-    burst(player.position.x, 1.2, player.position.z, 40);
+    invincible = true;
+    invincibleEnd = performance.now() + (shield ? 900 : INVINCIBLE_MS);
     shake = 1;
     clearBullets();
-    invincible = true;
-    invincibleEnd = performance.now() + INVINCIBLE_MS;
+
+    if (shield) {
+      // 护盾抵挡：破盾但不扣命
+      shield = false;
+      syncShield();
+      burst(player.position.x, 1.2, player.position.z, 36, 0xffd070);
+      showTip('护盾抵挡了一次', 't-shield');
+      return;
+    }
+
+    lives -= 1;
+    syncLives();
+    burst(player.position.x, 1.2, player.position.z, 40, 0xff6a7c);
 
     if (lives <= 0) endGame(false);
   }
@@ -473,6 +667,7 @@
     if (state === 'over') return;
     state = 'over';
     clearBullets();
+    clearPickups();
     if (hudEl) hudEl.classList.remove('danger');
 
     if (win) {
@@ -480,13 +675,14 @@
       modalSub.textContent = '180 秒全身而退，反应力不错。';
     } else {
       modalTitle.textContent = '生命耗尽';
-      modalSub.textContent = '被能量球击中 3 次。再来一局试试。';
+      modalSub.textContent = '被能量球击中 ' + START_LIVES + ' 次。再来一局试试。';
     }
     modal.classList.add('show');
   }
 
   function resetGame() {
     clearBullets();
+    clearPickups();
     player.position.set(0, 0, 0);
     player.rotation.y = 0;
     player.rotation.z = 0;
@@ -500,8 +696,11 @@
     spawnTimer = 0;
     elapsed = 0;
     shake = 0;
+    shield = false;
+    pickupTimer = 5;
 
     syncLives();
+    syncShield();
     syncTime();
     modal.classList.remove('show');
   }
@@ -548,14 +747,12 @@
       player.position.x = Math.max(-limit, Math.min(limit, player.position.x));
       player.position.z = Math.max(-limit, Math.min(limit, player.position.z));
 
-      // 平滑转向移动方向
       const target = Math.atan2(mx, mz);
       let diff = target - player.rotation.y;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       player.rotation.y += diff * Math.min(1, dt * 12);
 
-      // 移动倾斜（banking）
       player.rotation.z += (mx * -0.28 - player.rotation.z) * Math.min(1, dt * 8);
     } else {
       player.rotation.z += (0 - player.rotation.z) * Math.min(1, dt * 8);
@@ -565,12 +762,52 @@
     player.position.y = Math.sin(now * 0.0022) * 0.06;
     ring.rotation.z -= dt * (invincible ? 3.2 : 0.9);
     engineGlow.material.opacity = 0.5 + Math.sin(now * 0.02) * 0.25 + (mx || mz ? 0.25 : 0);
+    if (shield) {
+      shieldMesh.material.opacity = 0.13 + Math.sin(now * 0.005) * 0.05;
+      shieldMesh.rotation.y += dt * 0.8;
+    }
 
     // --- 生成能量球 ---
     spawnTimer += dt;
     while (spawnTimer >= SPAWN_INTERVAL) {
       spawnTimer -= SPAWN_INTERVAL;
       spawnBullet();
+    }
+
+    // --- 掉落物生成 ---
+    pickupTimer -= dt;
+    if (pickupTimer <= 0) {
+      spawnPickup();
+      pickupTimer = PICKUP_MIN_GAP + Math.random() * (PICKUP_MAX_GAP - PICKUP_MIN_GAP);
+    }
+
+    // --- 掉落物更新 + 拾取 ---
+    for (let i = pickups.length - 1; i >= 0; i--) {
+      const p = pickups[i];
+      p.age += dt;
+      p.core.rotation.y += dt * 1.6;
+      p.core.rotation.x += dt * 0.9;
+      p.base.rotation.z -= dt * 1.2;
+
+      p.obj.position.y = 1.1 + Math.sin(now * 0.003 + i * 2.1) * 0.14;
+
+      // 即将消失：闪烁
+      const remain = PICKUP_LIFETIME - p.age;
+      if (remain < 3) {
+        p.obj.visible = Math.sin(now * 0.012) > -0.2;
+      }
+      if (remain <= 0) {
+        removePickup(i);
+        continue;
+      }
+
+      // 拾取判定
+      const dx = p.obj.position.x - player.position.x;
+      const dz = p.obj.position.z - player.position.z;
+      if (dx * dx + dz * dz < PICKUP_RADIUS * PICKUP_RADIUS) {
+        collectPickup(p);
+        removePickup(i);
+      }
     }
 
     // --- 更新能量球 ---
@@ -582,7 +819,6 @@
       const pulse = 1 + Math.sin(now * 0.008 + i) * 0.09;
       b.obj.scale.setScalar(pulse);
 
-      // 拖尾：历史点依次后移
       const tp = b.trail.geometry.attributes.position.array;
       for (let k = TRAIL_LEN - 1; k > 0; k--) {
         tp[k * 3] = tp[(k - 1) * 3];
@@ -633,7 +869,7 @@
       beacons[i].scale.set(s, s, 1);
     }
 
-    // 相机轻微呼吸 + 受击震动
+    // 相机呼吸 + 受击震动
     camera.position.x = Math.sin(elapsed * 0.18) * 1.4;
     camera.position.y = 32 + Math.sin(elapsed * 0.5) * 0.7;
     if (shake > 0.01) {
@@ -658,6 +894,7 @@
 
   /* ---------------- 启动 ---------------- */
   syncLives();
+  syncShield();
   syncTime();
   requestAnimationFrame(animate);
 
@@ -667,6 +904,9 @@
     get lives() { return lives; },
     get timeLeft() { return timeLeft; },
     get bullets() { return bullets.length; },
+    get pickups() { return pickups.length; },
+    get shield() { return shield; },
+    spawnNow: function () { spawnPickup(); },
     reset: resetGame
   };
 })();
