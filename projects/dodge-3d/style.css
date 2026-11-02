@@ -158,6 +158,50 @@ html, body {
   transition: width 0.2s linear;
 }
 
+/* ---------- 护盾标记 ---------- */
+.shield-mark {
+  display: none;
+  align-self: center;
+  margin-left: 4px;
+  font-size: 16px;
+  color: #ffc94d;
+  text-shadow: 0 0 12px rgba(255, 200, 77, 0.8);
+  animation: shieldPulse 1.4s ease-in-out infinite;
+}
+.shield-mark.on { display: inline-block; }
+@keyframes shieldPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.88); }
+}
+
+/* ---------- 拾取提示 ---------- */
+#pickupTip {
+  position: fixed;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+  text-shadow: 0 2px 16px rgba(0, 8, 24, 0.9);
+}
+#pickupTip.show {
+  animation: tipRise 1.6s ease-out forwards;
+}
+#pickupTip.t-life { color: #4ff0a0; }
+#pickupTip.t-shield { color: #ffd070; }
+#pickupTip.t-time { color: #7db8ff; }
+@keyframes tipRise {
+  0% { opacity: 0; transform: translate(-50%, 14px) scale(0.92); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.04); }
+  22% { transform: translate(-50%, 0) scale(1); }
+  72% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -26px) scale(1); }
+}
+
 /* ---------- Modal ---------- */
 .modal {
   position: fixed;
